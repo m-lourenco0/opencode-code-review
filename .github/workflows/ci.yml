@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check installer syntax
+        run: bash -n install.sh
+
+      - name: ShellCheck
+        run: shellcheck install.sh
+
+      - name: Validate agent frontmatter
+        run: |
+          set -euo pipefail
+          for file in agents/*.md; do
+            first="$(head -n 1 "$file")"
+            if [ "$first" != "---" ]; then
+              echo "$file: missing opening frontmatter delimiter" >&2
+              exit 1
+            fi
+            end="$(awk 'NR > 1 && $0 == "---" { print NR; exit }' "$file")"
+            if [ -z "$end" ]; then
+              echo "$file: missing closing frontmatter delimiter" >&2
+              exit 1
+            fi
+            frontmatter="$(head -n "$end" "$file")"
+            for field in description mode permissions; do
+              if ! printf '%s\n' "$frontmatter" | grep -q "^${field}:"; then
+                echo "$file: missing frontmatter field: $field" >&2
+                exit 1
+              fi
+            done
+          done
+
+      - name: Smoke-test the installer
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          ./install.sh --agents-dir "$tmp"
+          cmp agents/code-reviewer.md "$tmp/code-reviewer.md"
+          cmp agents/review-lens.md "$tmp/review-lens.md"
+
+          ./install.sh --agents-dir "$tmp"
+          test -z "$(find "$tmp" -name '*.bak.*' -print -quit)"
+
+          ./install.sh --agents-dir "$tmp" --uninstall
+          test ! -e "$tmp/code-reviewer.md"
+          test ! -e "$tmp/review-lens.md"
