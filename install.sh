@@ -2,7 +2,7 @@
 # Install the opencode-code-review agents into an OpenCode V2 configuration.
 set -euo pipefail
 
-REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 AGENTS=(code-reviewer.md review-lens.md)
 
 SCOPE="global"
